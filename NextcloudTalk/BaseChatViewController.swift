@@ -1605,15 +1605,24 @@ import QuickLook
                         NSLog("Failed to share voice message")
                     }
                 })
-            } else if error.errorCode == 404 || error.errorCode == 409 {
-                NCAPIController.sharedInstance().checkOrCreateAttachmentFolder(for: activeAccount, withCompletionBlock: { created, _ in
-                    if created {
-                        self.uploadFileAtPath(localPath: localPath, withFileServerURL: fileServerURL, andFileServerPath: fileServerPath, withMetaData: talkMetaData)
-                    } else {
-                        NSLog("Failed to check or create attachment folder")
-                    }
-                })
-            } else {
+			} else if error.errorCode == 404 || error.errorCode == 409 {
+				NCAPIController.sharedInstance().checkOrCreateAttachmentFolder(for: activeAccount, withCompletionBlock: { created, _ in
+					if created {
+						self.uploadFileAtPath(localPath: localPath, withFileServerURL: fileServerURL, andFileServerPath: fileServerPath, withMetaData: talkMetaData)
+					} else {
+						NSLog("Failed to check or create attachment folder")
+					}
+				})
+			} else if error.errorCode == 507 {
+				let alert = UIAlertController(title: NSLocalizedString("Upload failed", comment: ""),
+											  message: error.errorDescription,
+											  preferredStyle: .alert)
+				
+				alert.addAction(UIAlertAction(title: NSLocalizedString("OK", comment: ""), style: .default))
+				
+				self.present(alert, animated: true)
+				NSLog("Failed to upload voice message due to missing storage quota")
+			} else {
                 NSLog("Failed upload voice message")
             }
         })
