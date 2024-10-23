@@ -26,8 +26,6 @@ import UIKit
     private var offlineMode = false
     private var hasStoredHistory = true
     private var hasStopped = false
-    private var viewWasShown = false
-    private var roomWasUpdated = false
 
     private var chatViewPresentedTimestamp = Date().timeIntervalSince1970
 
@@ -189,23 +187,45 @@ import UIKit
         }
 
         if !self.offlineMode {
-            if self.room == nil {
-                fatalRoomError("Room should not be nil")
-            }
-
             if self.room.token == nil {
-                fatalRoomError("Room token should not be nil")
+                fatalTokenError()
             }
 
             NCRoomsManager.sharedInstance().joinRoom(self.room.token, forCall: false)
         }
-
-        self.viewWasShown = true
     }
 
-    private func fatalRoomError(_ message: String) {
-        let errorMessage = "\(message): WasShown \(self.viewWasShown) | RoomWasUpdated \(self.roomWasUpdated)"
-        fatalError(errorMessage)
+    private func fatalTokenError() {
+        let capabilities = NCDatabaseManager.sharedInstance().serverCapabilities()
+
+        switch capabilities.versionMajor {
+        case 19:
+            fatalError()
+        case 20:
+            fatalError()
+        case 21:
+            fatalError()
+        case 22:
+            fatalError()
+        case 23:
+            fatalError()
+        case 24:
+            fatalError()
+        case 25:
+            fatalError()
+        case 26:
+            fatalError()
+        case 27:
+            fatalError()
+        case 28:
+            fatalError()
+        case 29:
+            fatalError()
+        case 30:
+            fatalError()
+        default:
+            fatalError()
+        }
     }
 
     public override func viewWillDisappear(_ animated: Bool) {
@@ -249,6 +269,10 @@ import UIKit
         self.checkForNewStoredMessages()
 
         if !self.offlineMode {
+            if self.room.token == nil {
+                fatalTokenError()
+            }
+            
             NCRoomsManager.sharedInstance().joinRoom(self.room.token, forCall: false)
         }
 
@@ -334,7 +358,7 @@ import UIKit
             // Disable call buttons
             self.videoCallButton.isEnabled = false
             self.voiceCallButton.isEnabled = false
-        } else if NCDatabaseManager.sharedInstance().roomHasTalkCapability(kCapabilityChatPermission, for: room), (room.permissions & NCPermission.chat.rawValue) == 0 {
+        } else if NCDatabaseManager.sharedInstance().roomHasTalkCapability(kCapabilityChatPermission, for: room), !room.permissions.contains(.chat) {
             // Hide text input
             self.setTextInputbarHidden(true, animated: isVisible)
         } else if self.isTextInputbarHidden {
@@ -666,8 +690,6 @@ import UIKit
         if room.token != self.room.token {
             return
         }
-
-        self.roomWasUpdated = true
 
         self.room = room
         self.setTitleView()
@@ -1181,7 +1203,7 @@ import UIKit
 
         if let permissionsString = appUserDict["participantPermissions"],
            let permissions = Int(permissionsString),
-           permissions != self.room.permissions {
+           permissions != self.room.permissions.rawValue {
 
             // Need to update the room from the api because otherwise "canStartCall" is not updated correctly
             NCRoomsManager.sharedInstance().updateRoom(self.room.token, withCompletionBlock: nil)
@@ -1283,7 +1305,7 @@ import UIKit
         NCDatabaseManager.sharedInstance().roomHasTalkCapability(kCapabilityConversationPermissions, for: room) ||
         NCDatabaseManager.sharedInstance().roomHasTalkCapability(kCapabilityDirectMentionFlag, for: room)
 
-        if serverSupportsConversationPermissions, (self.room.permissions & NCPermission.canIgnoreLobby.rawValue) != 0 {
+        if serverSupportsConversationPermissions, self.room.permissions.contains(.canIgnoreLobby) {
             return false
         }
 
@@ -1480,7 +1502,7 @@ import UIKit
     }
 
     override func getContextMenuAccessoryView(forMessage message: NCChatMessage, forIndexPath indexPath: IndexPath, withCellHeight cellHeight: CGFloat) -> UIView? {
-        let hasChatPermissions = !NCDatabaseManager.sharedInstance().roomHasTalkCapability(kCapabilityChatPermission, for: room) || (self.room.permissions & NCPermission.chat.rawValue) != 0
+        let hasChatPermissions = !NCDatabaseManager.sharedInstance().roomHasTalkCapability(kCapabilityChatPermission, for: room) || self.room.permissions.contains(.chat)
 
         guard hasChatPermissions && self.isMessageReactable(message: message) else { return nil }
 
@@ -1596,7 +1618,7 @@ import UIKit
         var actions: [UIMenuElement] = []
         var informationalActions: [UIMenuElement] = []
         let activeAccount = NCDatabaseManager.sharedInstance().activeAccount()
-        let hasChatPermissions = !NCDatabaseManager.sharedInstance().roomHasTalkCapability(kCapabilityChatPermission, for: room) || (self.room.permissions & NCPermission.chat.rawValue) != 0
+        let hasChatPermissions = !NCDatabaseManager.sharedInstance().roomHasTalkCapability(kCapabilityChatPermission, for: room) || self.room.permissions.contains(.chat)
 
         // Show edit information
         if let lastEditActorDisplayName = message.lastEditActorDisplayName, message.lastEditTimestamp > 0 {

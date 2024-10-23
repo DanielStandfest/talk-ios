@@ -12,16 +12,15 @@ struct UserStatusMessageSwiftUIView: View {
     @Binding var changed: Bool
     @State var showClearAtAlert: Bool = false
 
-    @State private var changedStatusFromPredefined: Bool = false
-    @State private var customStatusSelected: Bool = false
-    @State private var selectedPredifinedStatus: NKUserStatus?
-    @State private var statusPredefinedStatuses: [NKUserStatus] = []
+    @State private var selectedPredefinedMessageId: String?
+    @State private var predefinedStatuses: [NKUserStatus] = []
 
     @State private var selectedIcon: String = ""
     @State private var selectedMessage: String = ""
     @State private var selectedClearAt: Double = 0
     @State private var selectedClearAtString: String = ""
-    @State private var changedSmth: Bool = false
+
+    @State private var userHasStatusSet: Bool = false
 
     @State private var isLoading: Bool = true
     @FocusState private var textFieldIsFocused: Bool
@@ -47,39 +46,30 @@ struct UserStatusMessageSwiftUIView: View {
                 List {
                     Section(header: Text(NSLocalizedString("What is your status?", comment: ""))) {
                         HStack(spacing: 10) {
-                            EmojiTextFieldWrapper(placeholder: "😀", text: $selectedIcon)
+                            SingleEmojiTextFieldWrapper(placeholder: "😀", text: $selectedIcon)
                                 .frame(maxWidth: 23)
                                 .opacity(selectedIcon.isEmpty ? 0.5 : 1.0)
-                                .onChange(of: selectedIcon) { newString in
-                                    changedSmth = true
-                                    customStatusSelected = !changedStatusFromPredefined
-                                    changedStatusFromPredefined = false
-                                    if newString.count > 1 {
-                                        selectedIcon = String(newString.first!)
-                                    }
+                                .onChange(of: selectedIcon) { _ in
+                                    selectedPredefinedMessageId = nil
                                 }
                                 .tint(.primary)
                                 .focused($textFieldIsFocused)
                             Divider()
                             TextField(NSLocalizedString("What is your status?", comment: ""), text: $selectedMessage)
                                 .onChange(of: selectedMessage) { _ in
-                                    changedSmth = true
-                                    customStatusSelected = !changedStatusFromPredefined
-                                    changedStatusFromPredefined = false
+                                    selectedPredefinedMessageId = nil
                                 }
                                 .tint(.primary)
                                 .focused($textFieldIsFocused)
                         }
                     }
                     Section {
-                        ForEach(statusPredefinedStatuses, id: \.id) { status in
+                        ForEach(predefinedStatuses, id: \.id) { status in
                             Button(action: {
-                                changedStatusFromPredefined = true
-                                selectedPredifinedStatus = status
-                                customStatusSelected = false
-                                selectedIcon = selectedPredifinedStatus!.icon ?? "Empty"
-                                selectedMessage = selectedPredifinedStatus!.message ?? "Empty"
-                                selectedClearAt = selectedPredifinedStatus!.clearAt?.timeIntervalSince1970 ?? 0
+                                selectedPredefinedMessageId = status.id
+                                selectedIcon = status.icon ?? ""
+                                selectedMessage = status.message ?? ""
+                                selectedClearAt = status.clearAt?.timeIntervalSince1970 ?? 0
                                 selectedClearAtString = getPredefinedClearStatusText(clearAt: status.clearAt, clearAtTime: status.clearAtTime, clearAtType: status.clearAtType)
                                 setClearAt(clearAt: selectedClearAtString)
                             }) {
@@ -113,36 +103,34 @@ struct UserStatusMessageSwiftUIView: View {
                         }
                     }
                 }
-                        if !UIDevice.current.orientation.isLandscape {
-                            VStack(spacing: 10) {
-                                NCButtonSwiftUI(title: NSLocalizedString("Clear status message",
-                                                                         comment: ""),
-                                                action: clearActiveUserStatus,
-                                                style: .tertiary, height: 40,
-                                                disabled: Binding.constant(selectedMessage.isEmpty  && selectedIcon.isEmpty))
-                                NCButtonSwiftUI(title: NSLocalizedString("Set status message", comment: ""),
-                                                action: setActiveUserStatus,
-                                                style: .primary, height: 40,
-                                                disabled: Binding.constant(selectedMessage.isEmpty  || changedSmth == false))
-                                .padding(.bottom, 16)
-                            }
-                        } else {
-                            HStack(spacing: 10) {
-                                Spacer()
-                                NCButtonSwiftUI(title: NSLocalizedString("Clear status message",
-                                                                         comment: ""),
-                                                action: clearActiveUserStatus,
-                                                style: .tertiary, height: 40,
-                                                disabled: Binding.constant(selectedMessage.isEmpty && selectedIcon.isEmpty))
-                                .padding(.bottom, 16)
-                                NCButtonSwiftUI(title: NSLocalizedString("Set status message", comment: ""),
-                                                action: setActiveUserStatus,
-                                                style: .primary, height: 40,
-                                                disabled: Binding.constant(selectedMessage.isEmpty || changedSmth == false))
-                                .padding(.bottom, 16)
-                                Spacer()
-                            }
-                        }
+                if !UIDevice.current.orientation.isLandscape {
+                    VStack(spacing: 10) {
+                        NCButtonSwiftUI(title: NSLocalizedString("Clear status message", comment: ""),
+                                        action: clearActiveUserStatus,
+                                        style: .tertiary,
+                                        disabled: Binding.constant(!userHasStatusSet))
+                        NCButtonSwiftUI(title: NSLocalizedString("Set status message", comment: ""),
+                                        action: setActiveUserStatus,
+                                        style: .primary,
+                                        disabled: Binding.constant(selectedMessage.isEmpty && selectedIcon.isEmpty))
+                        .padding(.bottom, 16)
+                    }
+                } else {
+                    HStack(spacing: 10) {
+                        Spacer()
+                        NCButtonSwiftUI(title: NSLocalizedString("Clear status message", comment: ""),
+                                        action: clearActiveUserStatus,
+                                        style: .tertiary,
+                                        disabled: Binding.constant(!userHasStatusSet))
+                        .padding(.bottom, 16)
+                        NCButtonSwiftUI(title: NSLocalizedString("Set status message", comment: ""),
+                                        action: setActiveUserStatus,
+                                        style: .primary,
+                                        disabled: Binding.constant(selectedMessage.isEmpty && selectedIcon.isEmpty))
+                        .padding(.bottom, 16)
+                        Spacer()
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -192,17 +180,19 @@ struct UserStatusMessageSwiftUIView: View {
     func getStatus() {
         isLoading = true
         NCAPIController.sharedInstance().setupNCCommunication(for: NCDatabaseManager.sharedInstance().activeAccount())
-        NextcloudKit.shared.getUserStatus { _, clearAt, icon, message, _, _, _, _, _, _, error in
+        NextcloudKit.shared.getUserStatus { _, clearAt, icon, message, messageId, _, _, _, _, _, error in
             if error.errorCode == 0 {
-                selectedIcon = icon ?? "😀"
+                userHasStatusSet = !(icon?.isEmpty ?? true) || !(message?.isEmpty ?? true)
+                selectedIcon = icon ?? ""
                 selectedMessage = message ?? ""
+                selectedPredefinedMessageId = messageId
                 selectedClearAt = clearAt?.timeIntervalSince1970 ?? 0
                 selectedClearAtString = getPredefinedClearStatusText(clearAt: clearAt, clearAtTime: nil, clearAtType: nil)
             }
         }
         NextcloudKit.shared.getUserStatusPredefinedStatuses { _, userStatuses, _, error in
             if error.errorCode == 0 {
-                statusPredefinedStatuses = userStatuses!
+                predefinedStatuses = userStatuses ?? []
                 withAnimation {
                     isLoading = false
                 }
@@ -211,8 +201,8 @@ struct UserStatusMessageSwiftUIView: View {
     }
 
     func setActiveUserStatus() {
-        if !customStatusSelected, let selectedPredifinedStatus {
-            NextcloudKit.shared.setCustomMessagePredefined(messageId: selectedPredifinedStatus.id!, clearAt: selectedClearAt) { _, error in
+        if let selectedPredefinedMessageId {
+            NextcloudKit.shared.setCustomMessagePredefined(messageId: selectedPredefinedMessageId, clearAt: selectedClearAt) { _, error in
                 if error.errorCode == 0 {
                     dismiss()
                     changed.toggle()
@@ -222,7 +212,8 @@ struct UserStatusMessageSwiftUIView: View {
                 }
             }
         } else {
-            NextcloudKit.shared.setCustomMessageUserDefined(statusIcon: selectedIcon.isEmpty ? "😀" : selectedIcon, message: selectedMessage, clearAt: selectedClearAt) { _, error in
+            let statusIcon = selectedIcon.isEmpty ? nil : selectedIcon
+            NextcloudKit.shared.setCustomMessageUserDefined(statusIcon: statusIcon, message: selectedMessage, clearAt: selectedClearAt) { _, error in
                 if error.errorCode == 0 {
                     dismiss()
                     changed.toggle()
@@ -246,8 +237,8 @@ struct UserStatusMessageSwiftUIView: View {
     }
 
     func triggerErrorAlert(title: String, message: String) {
-        errorAlertTitle = NSLocalizedString("Could not clear status message", comment: "")
-        errorAlertMessage = NSLocalizedString("Could not clear status message", comment: "")
+        errorAlertTitle = title
+        errorAlertMessage = message
         showErrorAlert.toggle()
     }
 
@@ -285,7 +276,6 @@ struct UserStatusMessageSwiftUIView: View {
     func setClearAt(clearAt: String) {
         selectedClearAt = getClearAt(clearAt)
         selectedClearAtString = clearAt
-        customStatusSelected = true
     }
 
     func getPredefinedClearStatusText(clearAt: NSDate?, clearAtTime: String?, clearAtType: String?) -> String {
@@ -342,12 +332,5 @@ struct UserStatusMessageSwiftUIView: View {
         }
 
         return NSLocalizedString("Don't clear", comment: "")
-    }
-
-}
-
-struct UserStatusMessageSwiftUIView_Previews: PreviewProvider {
-    static var previews: some View {
-        UserStatusMessageSwiftUIView(changed: Binding.constant(false))
     }
 }

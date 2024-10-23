@@ -12,9 +12,6 @@
 #import "ContactsTableViewCell.h"
 #import "DetailedOptionsSelectorTableViewController.h"
 #import "HeaderWithButton.h"
-#import "NBPhoneNumber.h"
-#import "NBPhoneNumberDefines.h"
-#import "NBPhoneNumberUtil.h"
 #import "NCAPIController.h"
 #import "NCAppBranding.h"
 #import "NCConnectionController.h"
@@ -52,13 +49,11 @@
 
 #import "GeoLocationRichObject.h"
 #import "MessageSeparatorTableViewCell.h"
-#import "ObjectShareMessageTableViewCell.h"
 #import "NCChatMessage.h"
 #import "NCChatTitleView.h"
 #import "NCMessageParameter.h"
 #import "QuotedMessageView.h"
 #import "ReplyMessageView.h"
-#import "VoiceMessageTableViewCell.h"
 #import "SystemMessageTableViewCell.h"
 
 #import "JDStatusBarNotificationPresenter.h"
@@ -77,7 +72,6 @@
 #import "AutoCompletionTableViewCell.h"
 #import "NCKeyChainController.h"
 #import "NCIntentController.h"
-#import "MBProgressHUD.h"
 #import "CCCertificate.h"
 
 #import "ScreenCapturer.h"
@@ -87,5 +81,9 @@
 #import "NCNotification.h"
 
 #import "MessageBodyTextView.h"
+#import "NCAudioController.h"
+#import "NCCallController.h"
+#import "CallConstants.h"
+#import "AvatarBackgroundImageView.h"
 
 #endif /* NextcloudTalk_Bridging_Header_h */
